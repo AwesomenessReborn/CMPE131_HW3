@@ -1,33 +1,52 @@
 from app import myapp_obj
-from flask import render_template
+from flask import app, render_template, url_for
 from flask import redirect
-from app.forms import LoginForm
-from app.models import User, Profile
+from app.forms import LoginForm, RecipeForm
+from app.models import Recipe, User, Profile
 from app import db
 # from <X> import <Y>
 
-@myapp_obj.route("/")
-def main():
-    name = "carlos"
-    return render_template("hello.html", name=name)
+@app.route('/recipes')
+def index():
+    recipes = Recipe.query.all()
+    return render_template('index.html', recipes=recipes)
 
-@myapp_obj.route("/accounts")
-def users():
-    return "My USER ACCOUNTS"
-
-@myapp_obj.route("/login", methods=['GET', 'POST'])
-def login():
-    form = LoginForm()
+@app.route('/recipe/new', methods=['GET', 'POST'])
+def new_recipe():
+    form = RecipeForm()
     if form.validate_on_submit():
-        print(f"Here is the input from the user {form.username.data} and {form.password.data}")
-        return redirect("/")
-    else:
-        print("MOOOO MOOO")
-    return render_template("login.html", form=form)
-    # What is render template returning?
-    #return str(type(render_template("login.html", form=form)))
+        recipe = Recipe(
+            title=form.title.data,
+            description=form.description.data,
+            ingredients=form.ingredients.data,
+            instructions=form.instructions.data
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        return redirect(url_for('index'))
+    return render_template('recipe_form.html', form=form, title="New Recipe")
 
-@myapp_obj.route("/showall")
-def showall(): 
-    profiles = Profile.query.all()
-    return render_template("show_all.html", profiles=profiles)
+@app.route('/recipe/<int:recipe_id>')
+def recipe(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    return render_template('recipe.html', recipe=recipe)
+
+@app.route('/recipe/<int:recipe_id>/edit', methods=['GET', 'POST'])
+def edit_recipe(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    form = RecipeForm(obj=recipe)
+    if form.validate_on_submit():
+        recipe.title = form.title.data
+        recipe.description = form.description.data
+        recipe.ingredients = form.ingredients.data
+        recipe.instructions = form.instructions.data
+        db.session.commit()
+        return redirect(url_for('recipe', recipe_id=recipe.id))
+    return render_template('recipe_form.html', form=form, title="Edit Recipe")
+
+@app.route('/recipe/<int:recipe_id>/delete', methods=['POST'])
+def delete_recipe(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    db.session.delete(recipe)
+    db.session.commit()
+    return redirect(url_for('index'))
